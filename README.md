@@ -3,8 +3,8 @@
 A **Pi-hole-style DNS ad-blocker** that runs on a **$2 ESP32-C3** — *no PSRAM required*.
 
 The trick everyone misses: you don't need to keep the blocklist in RAM. Store the
-domains as **sorted 64-bit hashes in flash** and binary-search them. 130,000+ domains
-fit in ~1 MB of flash and are matched in microseconds, using **~40 KB of RAM**.
+domains as **sorted 40-bit hashes in flash** and binary-search them. 140,000+ domains
+fit in ~0.7 MB of flash and are matched in ~10 ms, using **~50 KB of RAM**.
 
 ```
 query in ──▶ extract domain ──▶ FNV-1a hash (+ parent suffixes)
@@ -16,16 +16,26 @@ query in ──▶ extract domain ──▶ FNV-1a hash (+ parent suffixes)
 ## Why this is interesting
 
 Most ESP32 DNS sinkholes load the blocklist (domain *strings*) into RAM, so they
-demand an ESP32-S3 with 4–8 MB of **PSRAM**. This project stores fixed **8-byte
-hashes in flash** instead:
+demand PSRAM. This project stores fixed **5-byte (40-bit) hashes in flash** instead:
 
 | | string-in-RAM approach | this (hash-in-flash) |
 |---|---|---|
-| Hardware | ESP32-S3 + 8 MB PSRAM (~$8) | ESP32-C3, no PSRAM (~$2) |
-| 130k domains | several MB of RAM | **1.02 MB of flash** |
-| RAM used | most of it | **~40 KB** |
-| Lookup | string compare | ~17 cached-flash reads (µs) |
-| Collisions | n/a | 0 (64-bit hash) |
+| Hardware | ESP32 + PSRAM (~$8) | ESP32-C3, no PSRAM (~$2) |
+| 141k domains | ~2.5 MB of RAM | **0.67 MB of flash** |
+| RAM used | most of it | **~50 KB** |
+| Lookup | string compare | ~18 flash reads (~10 ms incl. WiFi RTT) |
+| Collisions | n/a | 0 at 141k (1 at 537k) |
+
+**Why 40 bits?** It's the sweet spot for this flash budget. Collisions follow the
+birthday bound — at 141k domains you get ~0, at 537k about 1 (i.e. one unlucky
+domain gets over-blocked). Dropping to 32 bits would save 20% of the flash but
+cost ~7 collisions at 250k; going to 64 bits wastes 3 bytes per domain to solve
+a problem you don't have.
+
+The same trick works on bigger chips — it isn't a C3 workaround. On a 16 MB
+ESP32-S3 these hashes hold **~2.7M domains** vs ~466k for strings in 8 MB of
+PSRAM. Hashes in flash beat strings in PSRAM basically everywhere; the C3 just
+makes it undeniable.
 
 ## Hardware
 
