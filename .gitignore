@@ -6,6 +6,9 @@
 .DS_Store
 ._*
 
+# VS Code workspace file
+*.code-workspace
+
 # Generated blocklist (build it with tools/build_blocklist.py)
 data/blocklist.bin
 
